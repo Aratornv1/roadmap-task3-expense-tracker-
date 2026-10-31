@@ -5,11 +5,11 @@ export class UserError extends Error {}
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
-];
+]; // English month names for budget warnings
 
-export const emptyData = () => ({ nextId: 1, expenses: [], budgets: {} });
+export const emptyData = () => ({ nextId: 1, expenses: [], budgets: {} }); // create new data object with nextId, empty expenses array, and empty budgets object
 
-const round2 = (n) => Math.round(n * 100) / 100;
+const round2 = (n) => Math.round(n * 100) / 100; // round to 2 decimal places
 
 export function parseAmount(value) {
   const amount = Number(value);
@@ -18,7 +18,7 @@ export function parseAmount(value) {
   }
   if (amount <= 0) throw new UserError('Amount must be greater than zero.');
   return round2(amount);
-}
+}// parse amount from string, throw error if invalid, round to 2 decimal places
 
 export function parseMonth(value) {
   const month = Number(value);
@@ -26,34 +26,34 @@ export function parseMonth(value) {
     throw new UserError('Month must be an integer from 1 to 12.');
   }
   return month;
-}
+} // parse month from string, throw error if invalid
 
 export function parseId(value) {
   const id = Number(value);
   if (!Number.isInteger(id) || id < 1) throw new UserError('ID must be a positive integer.');
   return id;
-}
+}// parse id from string, throw error if invalid
 
 export function parseDescription(value) {
   const description = typeof value === 'string' ? value.trim() : '';
   if (!description) throw new UserError('Description is required.');
   return description;
-}
+}// parse description from string, throw error if empty
 
 export function isoDate(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
+} // convert Date object to YYYY-MM-DD string
 
-const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
+const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;// and key for budgets object
 
 function findExpense(data, id) {
   const expense = data.expenses.find((e) => e.id === id);
   if (!expense) throw new UserError(`Expense with ID ${id} not found.`);
   return expense;
-}
+}// search for expense by id, throw error if not found
 
 export function addExpense(data, { description, amount, category }, now = new Date()) {
   const expense = {
@@ -61,38 +61,38 @@ export function addExpense(data, { description, amount, category }, now = new Da
     date: isoDate(now),
     description: parseDescription(description),
     amount: parseAmount(amount),
-    category: category?.trim() || 'general',
+    category: category?.trim() || 'general',// if undefined or empty, default to 'general'
   };
   data.nextId += 1;
   data.expenses.push(expense);
   return expense;
-}
+} //make new expense object, increment nextId, add to expenses array, return new expense
 
 export function updateExpense(data, id, { description, amount, category }) {
   const expense = findExpense(data, parseId(id));
   if (description === undefined && amount === undefined && category === undefined) {
-    throw new UserError('Nothing to update: pass --description, --amount or --category.');
+    throw new UserError('Nothing to update: pass --description, --amount or --category.');// if  3 parameters are undefined, throw error
   }
   if (description !== undefined) expense.description = parseDescription(description);
   if (amount !== undefined) expense.amount = parseAmount(amount);
-  if (category !== undefined) expense.category = category.trim() || 'general';
+  if (category !== undefined) expense.category = category.trim() || 'general';// verification for 3 parameters, if category is undefined or empty, default to general
   return expense;
-}
+}// find expense by id, update fields if provided, return updated expense
 
 export function deleteExpense(data, id) {
   const expense = findExpense(data, parseId(id));
   data.expenses = data.expenses.filter((e) => e.id !== expense.id);
   return expense;
-}
+}// find expense by id, remove from expenses array, return deleted expense
 
 export function listExpenses(data, { category } = {}) {
   if (!category) return data.expenses;
   const wanted = category.trim().toLowerCase();
-  return data.expenses.filter((e) => e.category.toLowerCase() === wanted);
-}
+  return data.expenses.filter((e) => e.category.toLowerCase() === wanted); //Food=food
+} 
 
-// Підсумок за все життя або за місяць поточного року.
-export function summarize(data, { month, category } = {}, now = new Date()) {
+
+export function summarize(data, { month, category } = {}, now = new Date()) { 
   let expenses = listExpenses(data, { category });
   let monthNumber;
   if (month !== undefined) {
@@ -102,15 +102,15 @@ export function summarize(data, { month, category } = {}, now = new Date()) {
   }
   const total = round2(expenses.reduce((sum, e) => sum + e.amount, 0));
   return { total, monthName: monthNumber ? MONTH_NAMES[monthNumber - 1] : undefined };
-}
+}  // filter expenses by category and month, calculate total amount, return total and month name if applicable
 
 export function setBudget(data, month, amount, now = new Date()) {
   const key = monthKey(now.getFullYear(), parseMonth(month));
   data.budgets[key] = parseAmount(amount);
   return { key, amount: data.budgets[key] };
-}
+} // set budget for a specific month, return key and amount
 
-// Повертає null, якщо ліміт не заданий або не перевищений.
+
 export function budgetWarning(data, month, now = new Date()) {
   const monthNumber = parseMonth(month);
   const limit = data.budgets[monthKey(now.getFullYear(), monthNumber)];
@@ -118,30 +118,30 @@ export function budgetWarning(data, month, now = new Date()) {
   const { total } = summarize(data, { month: monthNumber }, now);
   if (total <= limit) return null;
   return { month: MONTH_NAMES[monthNumber - 1], limit, total };
-}
+} // check if total expenses for a month exceed the budget limit, return warning object if exceeded
 
 const csvCell = (value) => {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
+};//prepares data for CSV
 
 export function toCsv(expenses) {
   const header = 'ID,Date,Description,Category,Amount';
   const rows = expenses.map((e) =>
-    [e.id, e.date, e.description, e.category, e.amount].map(csvCell).join(','),
-  );
+    [e.id, e.date, e.description, e.category, e.amount].map(csvCell).join(','), // map each expense to a CSV row
+  ); 
   return [header, ...rows].join('\n') + '\n';
-}
+}// convert expenses array to CSV format, return as string
 
 export function formatMoney(n) {
   return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
-}
+} //format amount 
 
 export function formatTable(expenses) {
   const rows = [['ID', 'Date', 'Description', 'Category', 'Amount']];
   for (const e of expenses) {
     rows.push([String(e.id), e.date, e.description, e.category, formatMoney(e.amount)]);
   }
-  const widths = rows[0].map((_, col) => Math.max(...rows.map((r) => r[col].length)));
+  const widths = rows[0].map((_, col) => Math.max(...rows.map((r) => r[col].length))); //
   return rows.map((r) => r.map((cell, col) => cell.padEnd(widths[col])).join('  ').trimEnd()).join('\n');
-}
+} // format expenses array as a table with aligned columns, return as string
